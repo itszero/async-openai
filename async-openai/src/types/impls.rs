@@ -92,7 +92,24 @@ macro_rules! file_path_input {
 
 file_path_input!(ImageInput);
 file_path_input!(FileInput);
-file_path_input!(AudioInput);
+
+impl AudioInput {
+    pub fn new_with_path<P: AsRef<Path>>(path: P) -> Self {
+        Self::Path(PathBuf::from(path.as_ref()))
+    }
+
+    pub fn new_with_bytes<S: ToString>(file_name: S, bytes: Vec<u8>) -> Self {
+        Self::Bytes(file_name.to_string(), bytes)
+    }
+}
+
+// Cannot implement a From<(ToString, Vec<u8>)> due to unable to guarantee the tuple won't have an
+// AsRef<Path> implementation
+impl<P: AsRef<Path>> From<P> for AudioInput {
+    fn from(path: P) -> Self {
+        Self::Path(PathBuf::from(path.as_ref()))
+    }
+}
 
 impl Display for ImageSize {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -361,6 +378,12 @@ impl From<serde_json::Value> for ChatCompletionFunctionCall {
     }
 }
 
+impl Default for AudioInput {
+    fn default() -> Self {
+        Self::Path(PathBuf::new())
+    }
+}
+
 // start: types to multipart from
 
 #[async_convert::async_trait]
@@ -368,7 +391,14 @@ impl async_convert::TryFrom<CreateTranscriptionRequest> for reqwest::multipart::
     type Error = OpenAIError;
 
     async fn try_from(request: CreateTranscriptionRequest) -> Result<Self, Self::Error> {
-        let audio_part = create_file_part(&request.file.path).await?;
+        let audio_part = match &request.file {
+            AudioInput::Path(ref path) => create_file_part(&path).await?,
+            AudioInput::Bytes(ref file_name, ref bytes) => {
+                reqwest::multipart::Part::bytes(bytes.clone())
+                    .file_name(file_name.clone())
+                    .mime_str("application/octet-stream")?
+            }
+        };
 
         let mut form = reqwest::multipart::Form::new()
             .part("file", audio_part)
@@ -394,7 +424,14 @@ impl async_convert::TryFrom<CreateTranslationRequest> for reqwest::multipart::Fo
     type Error = OpenAIError;
 
     async fn try_from(request: CreateTranslationRequest) -> Result<Self, Self::Error> {
-        let audio_part = create_file_part(&request.file.path).await?;
+        let audio_part = match &request.file {
+            AudioInput::Path(ref path) => create_file_part(&path).await?,
+            AudioInput::Bytes(ref file_name, ref bytes) => {
+                reqwest::multipart::Part::bytes(bytes.clone())
+                    .file_name(file_name.clone())
+                    .mime_str("application/octet-stream")?
+            }
+        };
 
         let mut form = reqwest::multipart::Form::new()
             .part("file", audio_part)

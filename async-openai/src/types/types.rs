@@ -899,9 +899,16 @@ pub struct CreateChatCompletionStreamResponse {
     pub choices: Vec<ChatCompletionResponseStreamMessage>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum AudioInput {
+    Path(PathBuf),
+    Bytes(String, Vec<u8>),
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct AudioInput {
-    pub path: PathBuf,
+pub struct AudioInputBytes {
+    pub file_name: String,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Default, Clone, Copy, PartialEq)]
